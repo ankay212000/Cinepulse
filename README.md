@@ -6,15 +6,6 @@ A self-contained, cross-platform media streaming application powered by **Node.j
 
 ---
 
-## 🚀 How to Run on Any Operating System
-
-### 🪟 Windows (Zero Setup)
-1. Unzip `cinepulse-app.zip`.
-2. Double-click **`start-windows.bat`** (or right-click `start-windows.ps1` -> *Run with PowerShell*).
-3. *Done!* The script automatically downloads portable Node.js (if missing), installs dependencies, opens Google Chrome at `http://localhost:3000`, and starts the engine.
-
----
-
 ### 🍎 macOS & 🐧 Linux (Zero Setup)
 1. Open terminal in the unzipped folder.
 2. Run:
@@ -25,17 +16,8 @@ A self-contained, cross-platform media streaming application powered by **Node.j
 
 ---
 
-### 🐳 Docker (Windows / macOS / Linux)
-If you prefer running inside a container:
-```bash
-docker compose up --build
-```
-Navigate to `http://localhost:3000` in Google Chrome!
-
----
-
 ## 🛠️ Features Included
-- **Stremio-style Media Discovery Catalog**: Real-time trending movies, genre category filters, and search.
+- **Media Discovery Catalog**: Real-time trending movies, genre category filters, and search.
 - **On-Demand P2P BitTorrent Streaming**: Sequential downloading with instant playback.
 - **Dolby Digital Plus (DDP 5.1 / Atmos / EAC3) & HEVC Auto-Transcode**: Full audio/video compatibility across browsers.
 - **Downloads & Offline Disk Storage**: Local playback without internet connection.
