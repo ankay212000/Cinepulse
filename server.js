@@ -7,6 +7,8 @@ import { spawn } from 'child_process';
 import { TorrentEngine } from './engine.js';
 import { MediaCatalogService } from './catalog.js';
 import { SubtitleService, SUPPORTED_LANGUAGES } from './subtitles.js';
+import { createTunnel, closeTunnel } from './tunnel.js';
+import { createRoom, getRoom, joinRoom, leaveRoom, syncPlayback, sendRoomChatMessage, registerRoomSseClient, destroyRoom, updateRoomHostNickname } from './rooms.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -215,6 +217,168 @@ app.post('/api/torrent/select', (req, res) => {
 });
 
 /**
+ * In-memory Chat Message History (stores last 100 messages)
+ */
+const globalChatHistory = [
+  {
+    id: 'sys-welcome',
+    sender: 'CineChat',
+    text: '🍿 Pass the popcorn! Drop your hot takes & movie reactions live in CineChat!',
+    timestamp: Date.now(),
+    isSystem: true
+  }
+];
+
+/**
+ * ==========================================================================
+ * WATCH PARTY ROOMS & SCOPED CINECHAT API ENDPOINTS
+ * ==========================================================================
+ */
+
+// Create a Watch Party Room & spawn public reverse tunnel
+app.post('/api/room/create', async (req, res) => {
+  try {
+    const { infoHash, magnet, fileIndex, movieTitle, hostNickname, currentTime, isPaused } = req.body;
+    
+    // Spawn reverse tunnel for local port 3000
+    const tunnelResult = await createTunnel(PORT);
+
+    const status = engine.getTorrentStatus(infoHash);
+    let validFileIndex = parseInt(fileIndex || 0, 10);
+    if (status && status.files && status.files.length > 0) {
+      const bestVideo = status.files.find(f => f.isVideo) || status.files[0];
+      if (bestVideo && typeof bestVideo.index === 'number') validFileIndex = bestVideo.index;
+    }
+
+    const room = createRoom({
+      infoHash,
+      magnet,
+      fileIndex: validFileIndex,
+      movieTitle,
+      hostNickname: hostNickname || 'Host',
+      publicUrl: tunnelResult.url,
+      localUrl: `http://localhost:${PORT}`,
+      currentTime: parseFloat(currentTime || 0),
+      isPaused: typeof isPaused === 'boolean' ? isPaused : false
+    });
+
+    return res.json({
+      success: true,
+      roomId: room.roomId,
+      publicUrl: `${room.publicUrl}/?room=${room.roomId}`,
+      localUrl: `${room.localUrl}/?room=${room.roomId}`,
+      provider: tunnelResult.provider,
+      room
+    });
+  } catch (err) {
+    console.error('[Room Create Error]:', err);
+    return res.status(500).json({ error: 'Failed to create Watch Party room' });
+  }
+});
+
+// Destroy active Watch Party Room
+app.post('/api/room/destroy', async (req, res) => {
+  const { roomId } = req.body;
+  if (roomId) {
+    await destroyRoom(roomId);
+    return res.json({ success: true });
+  }
+  return res.status(400).json({ error: 'Missing roomId' });
+});
+
+// Update Host Nickname in active room
+app.post('/api/room/update-host', (req, res) => {
+  const { roomId, hostNickname } = req.body;
+  if (!roomId || !hostNickname) return res.status(400).json({ error: 'Missing parameters' });
+
+  const success = updateRoomHostNickname(roomId, hostNickname.trim());
+  if (!success) return res.status(404).json({ error: 'Room not found' });
+  return res.json({ success: true, hostNickname: hostNickname.trim() });
+});
+
+// Fetch Room Info for joining guests
+app.get('/api/room/info/:roomId', (req, res) => {
+  const room = getRoom(req.params.roomId);
+  if (!room) return res.status(404).json({ error: 'Watch Party Room not found' });
+
+  return res.json({
+    success: true,
+    roomId: room.roomId,
+    infoHash: room.infoHash,
+    magnet: room.magnet,
+    fileIndex: room.fileIndex,
+    movieTitle: room.movieTitle,
+    hostNickname: room.hostNickname,
+    memberCount: room.members.size,
+    members: Array.from(room.members.values()),
+    playbackState: room.playbackState
+  });
+});
+
+// Join a Watch Party Room
+app.post('/api/room/join', (req, res) => {
+  const { roomId, nickname } = req.body;
+  const room = joinRoom(roomId, nickname);
+  if (!room) return res.status(404).json({ error: 'Watch Party Room not found' });
+
+  return res.json({ success: true, room });
+});
+
+// Leave Watch Party Room
+app.post('/api/room/leave', (req, res) => {
+  const { roomId, nickname } = req.body;
+  if (roomId && nickname) {
+    leaveRoom(roomId, nickname);
+  }
+  return res.json({ success: true });
+});
+
+// Broadcast Playback Sync (Play, Pause, Seek)
+app.post('/api/room/sync', (req, res) => {
+  const { roomId, action, currentTime, isPaused } = req.body;
+  const state = syncPlayback(roomId, { action, currentTime, isPaused });
+  if (!state) return res.status(404).json({ error: 'Watch Party Room not found' });
+
+  return res.json({ success: true, playbackState: state });
+});
+
+// Send CineChat message in Room
+app.post('/api/room/chat/send', (req, res) => {
+  const { roomId, sender, text } = req.body;
+  if (!text || !text.trim()) return res.status(400).json({ error: 'Message text empty' });
+
+  const msg = sendRoomChatMessage(roomId, { sender, text: text.trim().substring(0, 250) });
+  if (!msg) return res.status(404).json({ error: 'Watch Party Room not found' });
+
+  return res.json({ success: true, message: msg });
+});
+
+// SSE Event Stream for Watch Party Room (Playback Sync + CineChat)
+app.get('/api/room/events/:roomId', (req, res) => {
+  const { roomId } = req.params;
+  
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.flushHeaders();
+
+  const success = registerRoomSseClient(roomId, res);
+  if (!success) {
+    res.write(`event: error\ndata: ${JSON.stringify({ error: 'Room not found' })}\n\n`);
+    res.end();
+  }
+});
+
+// Destroy Watch Party Room & close tunnel
+app.post('/api/room/destroy', async (req, res) => {
+  const { roomId } = req.body;
+  await destroyRoom(roomId);
+  return res.json({ success: true, message: 'Room destroyed' });
+});
+
+/**
  * Pause P2P Torrent Download
  */
 app.post('/api/torrent/pause/:infoHash', (req, res) => {
@@ -230,6 +394,101 @@ app.post('/api/torrent/resume/:infoHash', (req, res) => {
   const infoHash = req.params.infoHash;
   const ok = engine.resumeTorrent(infoHash);
   return res.json({ success: ok });
+});
+
+// HLS Playlist Generator Endpoint for Sliding Window MSE Streaming
+app.get('/api/stream/:infoHash/:fileIndex/hls/playlist.m3u8', async (req, res) => {
+  const { infoHash, fileIndex } = req.params;
+  try {
+    const torrent = await engine.waitForMetadata(infoHash, 30000);
+    if (!torrent || !torrent.files) return res.status(404).send('Torrent metadata not ready');
+
+    const targetIdx = fileIndex !== undefined ? parseInt(fileIndex, 10) : 0;
+    const file = torrent.files[targetIdx] || torrent.files[0];
+    const segmentDuration = 4; // 4-second segments
+    // Estimate duration (default 7200s if unknown)
+    const estimatedDuration = file.length ? Math.max(3600, Math.ceil(file.length / (2 * 1024 * 1024 / 8))) : 7200;
+    const numSegments = Math.ceil(estimatedDuration / segmentDuration);
+
+    let m3u8 = `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:${segmentDuration}\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n\n`;
+
+    for (let i = 0; i < numSegments; i++) {
+      m3u8 += `#EXTINF:${segmentDuration}.0,\n/api/stream/${infoHash}/${targetIdx}/hls/segment_${i}.ts\n`;
+    }
+
+    m3u8 += `#EXT-X-ENDLIST\n`;
+
+    res.writeHead(200, {
+      'Content-Type': 'application/x-mpegURL',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-cache'
+    });
+    return res.end(m3u8);
+  } catch (err) {
+    return res.status(500).send(err.message);
+  }
+});
+
+// HLS Segment Endpoint for 4-second TS slices
+app.get('/api/stream/:infoHash/:fileIndex/hls/segment_:segNum.ts', async (req, res) => {
+  const { infoHash, fileIndex, segNum } = req.params;
+  const segIndex = parseInt(segNum, 10);
+  const startTime = segIndex * 4;
+
+  try {
+    const torrent = await engine.waitForMetadata(infoHash, 30000);
+    if (!torrent || !torrent.files) return res.status(404).send('Metadata not ready');
+
+    const targetIdx = fileIndex !== undefined ? parseInt(fileIndex, 10) : 0;
+    const file = torrent.files[targetIdx] || torrent.files[0];
+
+    const potentialDiskPaths = [
+      path.join(engine.cacheDir, file.path || ''),
+      path.join(engine.cacheDir, file.name || ''),
+      file.path,
+      path.join(engine.cacheDir, torrent.name, file.path || ''),
+      path.join(engine.cacheDir, torrent.name, file.name || '')
+    ];
+    const diskFilePath = potentialDiskPaths.find(p => p && fs.existsSync(p) && fs.statSync(p).isFile());
+
+    res.writeHead(200, {
+      'Content-Type': 'video/mp2t',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'public, max-age=3600'
+    });
+
+    const ffmpegArgs = [
+      '-ss', startTime.toString(),
+      '-t', '4',
+      '-i', diskFilePath || 'pipe:0',
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast',
+      '-tune', 'zerolatency',
+      '-crf', '24',
+      '-maxrate', '2000k',
+      '-bufsize', '4000k',
+      '-vf', 'scale=-2:min(720\\,ih)',
+      '-c:a', 'aac',
+      '-ac', '2',
+      '-ar', '48000',
+      '-b:a', '128k',
+      '-output_ts_offset', startTime.toString(),
+      '-f', 'mpegts',
+      'pipe:1'
+    ];
+
+    const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+    if (!diskFilePath) {
+      const { stream } = engine.createStream(infoHash, targetIdx);
+      stream.pipe(ffmpeg.stdin);
+    }
+
+    ffmpeg.stdout.pipe(res);
+    ffmpeg.on('error', () => { try { res.end(); } catch (e) {} });
+    req.on('close', () => { try { ffmpeg.kill(); } catch (e) {} });
+  } catch (err) {
+    return res.status(500).send(err.message);
+  }
 });
 
 /**
@@ -265,11 +524,25 @@ async function handleStream(req, res) {
     const { stream, file } = engine.createStream(infoHash, fileIndex, rangeOptions);
     const fileSize = file.length;
 
-    const ext = path.extname(file.name).toLowerCase();
-    const isDirectPlayable = ['.mp4', '.webm', '.m4v', '.mov'].includes(ext) && req.query.transcode !== 'true';
+    // Direct Disk Read Optimization for 0ms lag-free streaming to guests
+    const potentialDiskPaths = [
+      path.join(engine.cacheDir, file.path || ''),
+      path.join(engine.cacheDir, file.name || ''),
+      file.path,
+      path.join(engine.cacheDir, torrent.name, file.path || ''),
+      path.join(engine.cacheDir, torrent.name, file.name || '')
+    ];
+    const diskFilePath = potentialDiskPaths.find(p => p && fs.existsSync(p) && fs.statSync(p).isFile());
+    const readStream = diskFilePath ? fs.createReadStream(diskFilePath, rangeOptions || {}) : stream;
 
-    if (!isDirectPlayable) {
-      console.log(`[FFmpeg Transmuxer] Remuxing ${file.name} (${ext}) [video: ${isX265 ? 'H264-ultrafast' : 'copy'}, audio: AAC, seek: ${startTime}s] for HTML5 web playback...`);
+    const ext = path.extname(file.name).toLowerCase();
+    const fileNameLower = (file.name || '').toLowerCase();
+    const isX265 = ['x265', 'hevc', 'h.265', '2160p', '4k', '10bit', 'hdr', 'hdr10', 'dv'].some(k => fileNameLower.includes(k));
+    const isPartyMode = req.query.party === 'true' || req.query.mode === 'party';
+    const isDirectPlayable = ['.mp4', '.webm', '.m4v', '.mov', '.mkv'].includes(ext) && req.query.transcode !== 'true' && !isPartyMode;
+
+    if (!isDirectPlayable || isPartyMode) {
+      console.log(`[FFmpeg Transmuxer] Remuxing ${file.name} (${ext}) [partyMode: ${isPartyMode}, video: ${isX265 || isPartyMode ? 'H264-zerolatency' : 'copy'}, audio: AAC, seek: ${startTime}s] for HTML5 web playback...`);
       res.writeHead(200, {
         'Content-Type': 'video/mp4',
         'Access-Control-Allow-Origin': '*',
@@ -286,9 +559,11 @@ async function handleStream(req, res) {
         ffmpegArgs.push('-ss', startTime.toString());
       }
 
-      const videoCodec = (isX265 || req.query.transcodeVideo === 'true') 
-        ? ['-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-crf', '23']
-        : ['-c:v', 'copy'];
+      const videoCodec = isPartyMode
+        ? ['-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-crf', '28', '-maxrate', '1200k', '-bufsize', '2400k', '-vf', 'scale=-2:min(720\\,ih)', '-g', '30']
+        : ((isX265 || req.query.transcodeVideo === 'true') 
+          ? ['-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-crf', '24', '-maxrate', '4000k', '-bufsize', '8000k']
+          : ['-c:v', 'copy']);
 
       const relFilePath = file ? (file.path || file.name) : null;
       const diskFilePath = (relFilePath && engine.cacheDir) ? path.join(engine.cacheDir, relFilePath) : null;
@@ -307,7 +582,8 @@ async function handleStream(req, res) {
         '-b:a', '256k',
         '-af', 'volume=1.5',
         '-f', 'mp4',
-        '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+        '-movflags', 'frag_keyframe+empty_moov+default_base_moof+omit_tfhd_offset+negative_cts_offsets',
+        '-frag_duration', '1000000',
         'pipe:1'
       );
 
@@ -327,7 +603,7 @@ async function handleStream(req, res) {
       });
 
       if (!useDiskInput) {
-        stream.pipe(ffmpeg.stdin);
+        readStream.pipe(ffmpeg.stdin);
       }
       ffmpeg.stdout.pipe(res);
 
@@ -344,11 +620,17 @@ async function handleStream(req, res) {
     const fileNameEscaped = encodeURIComponent(file.name);
 
     if (rangeHeader) {
-      let start = rangeOptions.start || 0;
-      let end = rangeOptions.end !== undefined ? rangeOptions.end : fileSize - 1;
+      let start = rangeOptions ? rangeOptions.start : 0;
+      let end = (rangeOptions && rangeOptions.end !== undefined) ? rangeOptions.end : fileSize - 1;
 
       if (isNaN(start)) start = 0;
       if (isNaN(end) || end >= fileSize) end = fileSize - 1;
+
+      // Reverse Tunnel Optimization: Cap open-ended chunks to 2MB when reading from disk to keep SSE chat fast
+      const MAX_CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
+      if (diskFilePath && (!rangeOptions || rangeOptions.end === undefined) && (end - start + 1) > MAX_CHUNK_SIZE) {
+        end = start + MAX_CHUNK_SIZE - 1;
+      }
 
       if (start >= fileSize || start > end) {
         res.writeHead(416, {
@@ -359,6 +641,9 @@ async function handleStream(req, res) {
       }
 
       const chunkSize = (end - start) + 1;
+      const chunkStream = diskFilePath 
+        ? fs.createReadStream(diskFilePath, { start, end }) 
+        : engine.createStream(infoHash, fileIndex, { start, end }).stream;
 
       res.writeHead(206, {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
@@ -366,8 +651,12 @@ async function handleStream(req, res) {
         'Content-Length': chunkSize,
         'Content-Type': mimeType,
         'Content-Disposition': `inline; filename="${fileNameEscaped}"`,
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=3600'
       });
+
+      if (req.method === 'HEAD') return res.end();
+      return chunkStream.pipe(res);
     } else {
       res.writeHead(200, {
         'Content-Length': fileSize,
@@ -382,9 +671,9 @@ async function handleStream(req, res) {
       return res.end();
     }
 
-    stream.pipe(res);
+    readStream.pipe(res);
 
-    stream.on('error', (err) => {
+    readStream.on('error', (err) => {
       console.error('[Stream Pipe Error]:', err.message);
       if (!res.headersSent) {
         res.status(500).send('Streaming error');
@@ -560,7 +849,9 @@ async function handleDiskStream(req, res) {
   const stat = fs.statSync(filePath);
   const fileSize = stat.size;
   const ext = path.extname(filePath).toLowerCase();
-  const isDirectPlayable = ['.mp4', '.webm', '.m4v', '.mov'].includes(ext) && req.query.transcode !== 'true';
+  const fileNameLower = (path.basename(filePath) + ' ' + folderName).toLowerCase();
+  const isX265 = ['x265', 'hevc', 'h.265', '2160p', '4k', '10bit', 'hdr', 'hdr10', 'dv'].some(k => fileNameLower.includes(k));
+  const isDirectPlayable = ['.mp4', '.webm', '.m4v', '.mov', '.mkv'].includes(ext) && req.query.transcode !== 'true';
 
   if (!isDirectPlayable) {
     console.log(`[Disk Player] Remuxing local file ${path.basename(filePath)} (${ext}) [video: ${isX265 ? 'H264-ultrafast' : 'copy'}, audio: AAC] for web playback...`);

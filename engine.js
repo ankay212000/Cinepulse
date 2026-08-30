@@ -411,8 +411,18 @@ export class TorrentEngine {
       if (typeof range.end === 'number') streamOpts.end = range.end;
     }
 
-    console.log(`[Stream Request] ${file.name} (Bytes: ${streamOpts.start || 0} - ${streamOpts.end || file.length - 1})`);
-    
+    // Dynamic Piece Prioritization on Range Seek
+    if (typeof streamOpts.start === 'number' && torrent.pieceLength && torrent.pieces) {
+      const fileStartByte = (file._start || 0) + streamOpts.start;
+      const startPiece = Math.floor(fileStartByte / torrent.pieceLength);
+      const endPiece = Math.min(startPiece + 40, torrent.pieces.length - 1);
+
+      for (let i = startPiece; i <= endPiece; i++) {
+        try { torrent.select(i, i, 2); } catch (e) {}
+      }
+      console.log(`[Seek Swarm Prioritization] ${file.name}: Prioritizing P2P seek pieces [${startPiece}..${endPiece}] (priority 2)`);
+    }
+
     const stream = file.createReadStream(streamOpts);
 
     if (!state.activeStreams) state.activeStreams = new Set();

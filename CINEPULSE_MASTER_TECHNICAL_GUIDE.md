@@ -16,10 +16,13 @@ Torrents are a primary vector for Mac and PC malware via malicious installer scr
 - When a torrent metadata resolves (`engine.js`), `TorrentSecurityScanner.sanitizeWebTorrentFiles(torrent)` calls `file.deselect()` on **every non-media or executable file**.
 - Executable payloads (`.exe`, `.dmg`, `.pkg`, `.app`, `.command`) are **100% blocked from downloading over P2P**.
 
-### 3. Double-Extension Trick Prevention
+### 3. Malware-Only Torrent Rejection (`403 Forbidden`)
+- If a torrent contains executable malware (`.exe`, `.dmg`, `.pkg`, `.app`, `.command`) and **no valid video files**, `server.js` refuses to stream or download it, returning `403 Forbidden`.
+
+### 4. Double-Extension Trick Prevention
 - Filenames like `movie.mp4.exe` or `setup.mkv.app` are detected as malware traps (`threatLevel = 'DANGEROUS'`).
 
-### 4. UI Security Status & Shield Badging
+### 5. UI Security Status & Shield Badging
 - Displays `🛡️ Security Verified` for clean torrents and `🛡️ Security Alert: X non-media files blocked` if non-media files were suppressed.
 
 ---
@@ -40,6 +43,19 @@ Torrents are a primary vector for Mac and PC malware via malicious installer scr
 
 ### 4. Cross-Platform Node 20+ / WebTorrent Compatibility
 - **uint8-util Buffer Patch**: Includes a global safety wrapper for `Buffer.from(undefined)` calls in `uint8-util`, preventing `TypeError [ERR_INVALID_ARG_TYPE]` across all Node 18, 20, 22, and 23 ESM/macOS environments.
+
+---
+
+## Files Changed / Added for Git Commit
+
+1. **`security.js`** *(NEW)*: Security threat classifier, extension allowlist/blocklist, double-extension trick detection, and WebTorrent P2P non-media file deselecting.
+2. **`engine.js`** *(MODIFIED)*: Integrated `TorrentSecurityScanner` inspection & sanitization, plus global Node 20+ `Buffer.from` safety patch.
+3. **`server.js`** *(MODIFIED)*: Added 403 malware torrent rejection, OS-agnostic VLC HTTP launcher, and HTTP 416 range EOF sanitization.
+4. **`public/index.html`** *(MODIFIED)*: Added `#security-pill` badge and `#security-warning` threat alert banner.
+5. **`public/app.js`** *(MODIFIED)*: Rendered security report status in telemetry and added `safeSeek` disk folder stream support.
+6. **`CINEPULSE_MASTER_TECHNICAL_GUIDE.md`** *(UPDATED)*: Documented Security Shield architecture and features.
+7. **`CINEPULSE_ISSUES_AND_DESIGN_DOC.md`** *(UPDATED)*: Documented malware filtering resolutions.
+8. **`DESIGN_DOC.md`** *(UPDATED)*: Updated HLD/LLD security component design.
 
 ---
 
