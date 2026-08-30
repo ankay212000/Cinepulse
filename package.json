@@ -1,0 +1,27 @@
+{
+  "name": "cinepulse",
+  "version": "1.0.0",
+  "description": "CinePulse - On-demand sequential BitTorrent video streaming engine",
+  "main": "server.js",
+  "type": "module",
+  "bin": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build:exe": "npx @yao-pkg/pkg . --targets node20-win-x64,node20-macos-x64,node20-linux-x64 --output dist/cinepulse"
+  },
+  "keywords": [
+    "torrent",
+    "streamer",
+    "webtorrent",
+    "video",
+    "p2p",
+    "mvp"
+  ],
+  "author": "Google SWE",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "webtorrent": "^2.4.0"
+  }
+}
