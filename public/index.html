@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CinePulse - Personal Media Hub</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Section -->
+    <header class="app-header">
+      <div class="top-navbar">
+        <!-- Extreme Left: Smaller "CinePulse" Logo -->
+        <div class="navbar-left">
+          <div id="app-logo" class="logo">
+            <i class="fa-solid fa-bolt logo-icon"></i>
+            <h1>CinePulse</h1>
+          </div>
+        </div>
+
+        <!-- Center: Search Bar -->
+        <div class="navbar-center" id="navbar-center-search">
+          <div class="search-bar">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="catalog-search-input" placeholder="Search HD Movies by title (e.g. Inception, Avatar, Dune)..." autocomplete="off" />
+            <button id="btn-catalog-search" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+          </div>
+        </div>
+
+        <!-- Extreme Right: Navigation Tabs -->
+        <div class="navbar-right">
+          <nav class="top-nav-tabs nav-tabs">
+            <button id="btn-home" class="nav-tab active">
+              <i class="fa-solid fa-house"></i> Home
+            </button>
+            <button id="tab-downloads" class="nav-tab">
+              <i class="fa-solid fa-hard-drive"></i> Downloads
+            </button>
+            <button id="tab-magnet" class="nav-tab">
+              <i class="fa-solid fa-magnet"></i> Direct Magnet / File
+            </button>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- SECTION 1: HOME CATALOG (Stremio Experience) -->
+      <section id="section-discover" class="card catalog-card">
+        <div class="catalog-header">
+          <!-- Genre / Category Selection Bar -->
+          <div id="category-pills-bar" class="category-pills-bar">
+            <button class="category-pill active" data-genre="all"><i class="fa-solid fa-border-all"></i> All</button>
+            <button class="category-pill" data-genre="action"><i class="fa-solid fa-gun"></i> Action</button>
+            <button class="category-pill" data-genre="sci-fi"><i class="fa-solid fa-user-astronaut"></i> Sci-Fi</button>
+            <button class="category-pill" data-genre="comedy"><i class="fa-solid fa-masks-theater"></i> Comedy</button>
+            <button class="category-pill" data-genre="drama"><i class="fa-solid fa-film"></i> Drama</button>
+            <button class="category-pill" data-genre="horror"><i class="fa-solid fa-ghost"></i> Horror</button>
+            <button class="category-pill" data-genre="thriller"><i class="fa-solid fa-user-ninja"></i> Thriller</button>
+            <button class="category-pill" data-genre="animation"><i class="fa-solid fa-wand-magic-sparkles"></i> Animation</button>
+            <button class="category-pill" data-genre="adventure"><i class="fa-solid fa-compass"></i> Adventure</button>
+            <button class="category-pill" data-genre="romance"><i class="fa-solid fa-heart"></i> Romance</button>
+          </div>
+        </div>
+
+        <!-- High Quality Hero Single-Movie Carousel -->
+        <div id="featured-carousel-section" class="hero-carousel-section">
+          <div class="carousel-container">
+            <div id="carousel-track" class="hero-carousel-track">
+              <div class="grid-loading">
+                <i class="fa-solid fa-spinner fa-spin spinner"></i>
+                <span>Loading Featured Movie...</span>
+              </div>
+            </div>
+            <button id="carousel-prev" class="hero-nav-btn prev" title="Previous"><i class="fa-solid fa-chevron-left"></i></button>
+            <button id="carousel-next" class="hero-nav-btn next" title="Next"><i class="fa-solid fa-chevron-right"></i></button>
+            <div id="carousel-dots" class="hero-dots"></div>
+          </div>
+        </div>
+
+        <div class="catalog-section-title">
+          <h2 id="catalog-title"><i class="fa-solid fa-fire"></i> Movies For You</h2>
+        </div>
+
+        <!-- Movie Poster Grid -->
+        <div id="movie-grid" class="movie-grid">
+          <div class="grid-loading">
+            <i class="fa-solid fa-spinner fa-spin spinner"></i>
+            <span>Loading Movies Catalog...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: DIRECT MAGNET OR FILE UPLOAD -->
+      <section id="section-magnet" class="card input-card hidden">
+        <h2><i class="fa-solid fa-magnet"></i> Stream Direct Magnet / Torrent File</h2>
+        
+        <form id="torrent-form" class="torrent-form">
+          <div class="input-group">
+            <input 
+              type="text" 
+              id="magnet-input" 
+              placeholder="Paste magnet link (e.g. magnet:?xt=urn:btih:...)" 
+              required
+              autocomplete="off"
+            />
+            <button type="submit" id="btn-stream" class="btn btn-primary">
+              <i class="fa-solid fa-play"></i> Stream & Play
+            </button>
+          </div>
+        </form>
+
+        <div class="drop-zone" id="drop-zone">
+          <i class="fa-solid fa-file-arrow-up drop-icon"></i>
+          <span>Drag & Drop a <strong>.torrent</strong> file here or click to browse</span>
+          <input type="file" id="file-input" accept=".torrent" style="display: none;">
+        </div>
+      </section>
+
+      <!-- SECTION 3: DOWNLOADS & STORAGE MANAGER -->
+      <section id="section-downloads" class="card downloads-card hidden">
+        <div class="downloads-header">
+          <div class="storage-stats-info">
+            <h2><i class="fa-solid fa-hard-drive"></i> Downloaded Movies & Storage Manager</h2>
+            <p>Manage movies and video files downloaded to your disk cache (<code>/tmp/cinepulse_cache</code>).</p>
+          </div>
+          <div class="storage-action-box">
+            <div class="storage-size-pill" id="storage-total-size"><i class="fa-solid fa-database"></i> Total Disk Used: 0 MB</div>
+            <button id="btn-clear-all-downloads" class="btn btn-danger">
+              <i class="fa-solid fa-trash-can"></i> Clear All Storage
+            </button>
+          </div>
+        </div>
+
+        <div id="downloads-grid" class="downloads-grid">
+          <div class="grid-loading">
+            <i class="fa-solid fa-spinner fa-spin spinner"></i>
+            <span>Loading downloaded files on disk...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ACTIVE STREAM DASHBOARD & VIDEO PLAYER -->
+      <section id="stream-section" class="card stream-card hidden">
+        <div class="stream-header">
+          <div class="stream-title-box">
+            <h3 id="torrent-title">Connecting to Swarm...</h3>
+            <div id="status-pill" class="pill pill-warning">
+              <i class="fa-solid fa-circle-notch fa-spin"></i> Finding Peers
+            </div>
+            <div id="security-pill" class="pill pill-success">
+              <i class="fa-solid fa-shield-halved"></i> Security Verified
+            </div>
+          </div>
+
+          <div class="header-actions">
+            <button id="btn-stream-home" class="btn btn-secondary" title="Return to Home Screen">
+              <i class="fa-solid fa-house"></i> Home
+            </button>
+            <button id="btn-stop" class="btn btn-danger" title="Stop Torrent & Clear Cache">
+              <i class="fa-solid fa-square"></i> Stop & Clear Cache
+            </button>
+          </div>
+        </div>
+
+        <!-- Security Shield Threat Banner -->
+        <div id="security-warning" class="banner banner-warning hidden" style="border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.1);">
+          <i class="fa-solid fa-shield-cat banner-icon" style="color: #f59e0b;"></i>
+          <div>
+            <strong>🛡️ Security Shield Active:</strong> 
+            <span id="security-notice-text">Non-media/executable files were automatically blocked from P2P download.</span>
+          </div>
+        </div>
+
+        <!-- Non-Web Format Warning Banner -->
+        <div id="format-warning" class="banner banner-info hidden">
+          <i class="fa-solid fa-circle-info banner-icon"></i>
+          <div>
+            <strong>Container / Codec Notice:</strong> 
+            <span id="format-notice-text">This video container (.mkv) will be remuxed on the fly for web browser playback.</span>
+          </div>
+        </div>
+
+        <!-- Video Player Box, Seek Feedback & Subtitle Overlay -->
+        <div class="player-wrapper">
+          <video id="video-player" controls preload="auto" crossorigin="anonymous">
+            Your browser does not support HTML5 video streaming.
+          </video>
+          
+          <!-- Subtitle Render Overlay -->
+          <div id="subtitle-overlay" class="subtitle-overlay"></div>
+
+          <!-- Seek / Volume Quick Feedback Overlay -->
+          <div id="seek-indicator" class="seek-indicator hidden"></div>
+
+          <div id="player-overlay" class="player-overlay">
+            <div class="spinner-box">
+              <i class="fa-solid fa-compact-disc fa-spin spinner-icon"></i>
+              <div id="overlay-text" class="overlay-text">Connecting to P2P Swarm...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBTITLE SELECTION & STYLING TILE PANEL -->
+        <div class="subtitle-control-card">
+          <div class="subtitle-header">
+            <h3><i class="fa-solid fa-closed-captioning"></i> Subtitles & Custom Styling</h3>
+            <span class="subtitle-badge">Active</span>
+          </div>
+
+          <!-- Selection Controls Row -->
+          <div class="subtitle-row">
+            <div class="subtitle-group">
+              <label for="sub-lang-select"><i class="fa-solid fa-globe"></i> Language:</label>
+              <select id="sub-lang-select" class="custom-select">
+                <option value="eng">English</option>
+                <option value="spa">Spanish</option>
+                <option value="fre">French</option>
+                <option value="ger">German</option>
+                <option value="ita">Italian</option>
+                <option value="hin">Hindi</option>
+                <option value="zho">Chinese</option>
+                <option value="jpn">Japanese</option>
+              </select>
+            </div>
+
+            <div class="subtitle-group flex-2">
+              <label for="sub-track-select"><i class="fa-solid fa-list"></i> Select Track:</label>
+              <select id="sub-track-select" class="custom-select">
+                <option value="off">Off (No Subtitles)</option>
+              </select>
+            </div>
+
+            <div class="subtitle-group">
+              <button id="btn-upload-sub" class="btn btn-secondary" title="Upload local .SRT / .VTT file">
+                <i class="fa-solid fa-upload"></i> Upload .SRT
+              </button>
+              <input type="file" id="sub-file-input" accept=".srt,.vtt" style="display: none;">
+            </div>
+          </div>
+
+          <!-- Styling Controls Row -->
+          <div class="subtitle-row subtitle-styling-row">
+            <div class="style-group">
+              <label for="sub-font-size"><i class="fa-solid fa-text-height"></i> Font Size:</label>
+              <select id="sub-font-size" class="custom-select-sm">
+                <option value="16px">Small (16px)</option>
+                <option value="22px" selected>Medium (22px)</option>
+                <option value="28px">Large (28px)</option>
+                <option value="36px">Extra Large (36px)</option>
+              </select>
+            </div>
+
+            <div class="style-group">
+              <label for="sub-font-family"><i class="fa-solid fa-font"></i> Font Style:</label>
+              <select id="sub-font-family" class="custom-select-sm">
+                <option value="system-ui, sans-serif" selected>Sans-Serif (Clean)</option>
+                <option value="'Times New Roman', serif">Serif (Classic)</option>
+                <option value="'Courier New', monospace">Monospace (Code)</option>
+                <option value="Impact, Arial Black, sans-serif">Impact / Display</option>
+                <option value="'Comic Sans MS', cursive">Cursive</option>
+              </select>
+            </div>
+
+            <div class="style-group">
+              <label for="sub-bg-opacity"><i class="fa-solid fa-circle-half-stroke"></i> Background:</label>
+              <select id="sub-bg-opacity" class="custom-select-sm">
+                <option value="0">Transparent (0%)</option>
+                <option value="0.25">Quarter (25%)</option>
+                <option value="0.5">Half (50%)</option>
+                <option value="0.75" selected>Dark (75%)</option>
+                <option value="1.0">Solid Black (100%)</option>
+              </select>
+            </div>
+
+            <div class="style-group">
+              <label for="sub-color"><i class="fa-solid fa-palette"></i> Text Color:</label>
+              <select id="sub-color" class="custom-select-sm">
+                <option value="#ffffff" selected>White</option>
+                <option value="#fbbf24">Yellow</option>
+                <option value="#10b981">Green</option>
+                <option value="#06b6d4">Cyan</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- File Selector (if multiple files exist) -->
+        <div id="file-selector-box" class="file-selector-box hidden">
+          <label for="file-select"><i class="fa-solid fa-list-ul"></i> Select Media File:</label>
+          <select id="file-select" class="custom-select"></select>
+        </div>
+
+        <!-- Telemetry & Live Stats Grid -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">Download Speed</span>
+            <span id="stat-download-speed" class="stat-value highlight-green">0 KB/s</span>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-label">Upload Speed</span>
+            <span id="stat-upload-speed" class="stat-value">0 KB/s</span>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-label">Active Peers</span>
+            <span id="stat-peers" class="stat-value">0</span>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-label">Time To First Frame</span>
+            <span id="stat-ttff" class="stat-value highlight-yellow">--</span>
+          </div>
+        </div>
+
+        <!-- Progress Bar & Download Action Controls -->
+        <div class="progress-box">
+          <div class="progress-info">
+            <span id="progress-text">Downloaded: 0 MB / 0 MB (0%)</span>
+            <span id="eta-text">ETA: Calculating...</span>
+          </div>
+          <div class="progress-track">
+            <div id="progress-bar" class="progress-fill" style="width: 0%;"></div>
+          </div>
+          <div class="progress-action-bar">
+            <button id="btn-stream-pause" class="btn btn-secondary btn-sm" title="Pause / Resume P2P Download">
+              <i class="fa-solid fa-pause"></i> Pause Download
+            </button>
+            <button id="btn-stream-cancel" class="btn btn-danger btn-sm" title="Cancel Download & Delete Cache">
+              <i class="fa-solid fa-xmark"></i> Cancel Download
+            </button>
+          </div>
+          <div id="pause-disclaimer" class="pause-disclaimer hidden">
+            <i class="fa-solid fa-circle-info"></i> <strong>Note:</strong> Resuming a paused download re-connects to the BitTorrent P2P swarm and may take 30–60 seconds to re-discover active peers and reach full speed.
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- STREAM SELECTION MODAL -->
+    <div id="stream-modal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <button id="modal-close" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        <div class="modal-body">
+          <div class="modal-poster-col">
+            <img id="modal-poster" src="" alt="Movie Poster" />
+          </div>
+          <div class="modal-info-col">
+            <h2 id="modal-title">Movie Title</h2>
+            <div class="modal-meta-row">
+              <span id="modal-year" class="badge-tag">2024</span>
+              <span id="modal-rating" class="badge-tag badge-star"><i class="fa-solid fa-star"></i> 8.5</span>
+              <span id="modal-genres" class="badge-genres">Action, Sci-Fi</span>
+            </div>
+            <p id="modal-summary" class="modal-summary">Movie plot summary...</p>
+
+            <h3 class="streams-heading"><i class="fa-solid fa-circle-play"></i> Select Stream Quality</h3>
+            <div id="modal-streams-list" class="streams-list">
+              <div class="spinner-box"><i class="fa-solid fa-circle-notch fa-spin"></i> Fetching stream sources...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
