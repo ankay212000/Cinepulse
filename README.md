@@ -19,6 +19,8 @@ A self-contained, cross-platform media streaming application powered by **Node.j
 ## 🛠️ Features Included
 - **Media Discovery Catalog**: Real-time trending movies, genre category filters, and search.
 - **On-Demand P2P BitTorrent Streaming**: Sequential downloading with instant playback.
-- **Dolby Digital Plus (DDP 5.1 / Atmos / EAC3) & HEVC Auto-Transcode**: Full audio/video compatibility across browsers.
+- **Native VLC Media Player Integration**: One-click `[Open in VLC]` streaming over HTTP for 100% native Dolby Atmos / DDP 5.1 surround sound decoding and GPU video acceleration on macOS, Windows, and Linux.
+- **Security Shield Anti-Malware Guard**: Real-time torrent metadata scanner that automatically deselects and blocks non-media or executable files (`.exe`, `.dmg`, `.pkg`, `.app`, `.command`, `.sh`) from downloading to your disk.
+- **Dolby Digital Plus (DDP 5.1 / Atmos / EAC3) & HEVC Auto-Transcode**: Full audio/video compatibility across browsers and external players.
 - **Downloads & Offline Disk Storage**: Local playback without internet connection.
 - **Custom Subtitle Engine**: Auto-fetching OpenSubtitles & custom WebVTT rendering.
