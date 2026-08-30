@@ -4,7 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CinePulse - Personal Media Hub</title>
+  <link rel="icon" href="data:image/x-icon;base64,iVBORw0KGgo=">
   <link rel="stylesheet" href="styles.css">
+  <script>
+    if (window.location.search.includes('room=')) {
+      document.documentElement.classList.add('is-room-mode');
+      document.addEventListener('DOMContentLoaded', () => {
+        const joinModal = document.getElementById('join-room-modal');
+        const discoverSec = document.getElementById('section-discover');
+        const carouselSec = document.getElementById('hero-carousel-section');
+        const streamSec = document.getElementById('stream-section');
+        if (discoverSec) discoverSec.classList.add('hidden');
+        if (carouselSec) carouselSec.classList.add('hidden');
+        if (streamSec) streamSec.classList.remove('hidden');
+        if (joinModal) joinModal.classList.remove('hidden');
+      });
+    }
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://www.youtube.com/iframe_api"></script>
 </head>
@@ -156,9 +172,15 @@
             <div id="security-pill" class="pill pill-success">
               <i class="fa-solid fa-shield-halved"></i> Security Verified
             </div>
+            <div id="party-pill" class="pill pill-info hidden">
+              <i class="fa-solid fa-users"></i> Watch Party Active
+            </div>
           </div>
 
           <div class="header-actions">
+            <button id="btn-create-party" class="btn btn-accent" title="Create Watch Party & Share Link">
+              <i class="fa-solid fa-users"></i> Create Watch Party 🍿
+            </button>
             <button id="btn-stream-home" class="btn btn-secondary" title="Return to Home Screen">
               <i class="fa-solid fa-house"></i> Home
             </button>
@@ -186,6 +208,26 @@
           </div>
         </div>
 
+        <!-- Spacious Watch Party Banner -->
+        <div id="watch-party-banner" class="watch-party-banner hidden">
+          <div class="party-banner-left">
+            <div class="party-badge-icon"><i class="fa-solid fa-users-line"></i></div>
+            <div class="party-banner-info">
+              <div class="party-banner-title">
+                <span class="party-tag">WATCH PARTY ROOM</span>
+                <h4 id="party-movie-name">Movie Title</h4>
+              </div>
+              <div class="party-banner-meta">
+                <span id="party-host-name"><i class="fa-solid fa-crown"></i> Host: Nitish</span>
+                <span id="party-member-count"><i class="fa-solid fa-users"></i> 1 Member Watching</span>
+              </div>
+            </div>
+          </div>
+          <div class="party-banner-right">
+            <span id="party-role-badge" class="role-badge role-guest">Guest (Synced to Host)</span>
+          </div>
+        </div>
+
         <!-- Video Player Box, Seek Feedback & Subtitle Overlay -->
         <div class="player-wrapper">
           <video id="video-player" controls preload="auto" crossorigin="anonymous">
@@ -198,10 +240,39 @@
           <!-- Seek / Volume Quick Feedback Overlay -->
           <div id="seek-indicator" class="seek-indicator hidden"></div>
 
+
+
           <div id="player-overlay" class="player-overlay">
             <div class="spinner-box">
               <i class="fa-solid fa-compact-disc fa-spin spinner-icon"></i>
               <div id="overlay-text" class="overlay-text">Connecting to P2P Swarm...</div>
+            </div>
+          </div>
+
+          <!-- Floating Live Chat Overlay Panel (Visible only in Watch Party Room mode) -->
+          <div id="chat-overlay" class="chat-overlay-container hidden">
+            <div class="chat-header">
+              <div class="chat-header-title">
+                <i class="fa-solid fa-comments"></i> 
+                <span>CineChat</span>
+                <span id="chat-nickname-badge" class="chat-nickname-badge" title="Click to change Nickname">Guest</span>
+              </div>
+              <div class="chat-header-controls">
+                <button id="btn-toggle-chat" class="chat-icon-btn" title="Minimize/Maximize Chat">
+                  <i class="fa-solid fa-chevron-down"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="chat-body" class="chat-body">
+              <div id="chat-messages" class="chat-messages-container"></div>
+
+              <div class="chat-input-row">
+                <input type="text" id="chat-input" class="chat-input" placeholder="Type a message..." maxlength="200" autocomplete="off" />
+                <button id="btn-send-chat" class="btn-chat-send" title="Send Message">
+                  <i class="fa-solid fa-paper-plane"></i>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -370,11 +441,88 @@
       </div>
     </div>
 
+    <!-- JOIN WATCH PARTY MODAL -->
+    <div id="join-room-modal" class="modal-backdrop hidden">
+      <div class="modal-card modal-card-sm party-modal-card">
+        <div class="modal-header party-modal-header">
+          <div class="party-modal-title">
+            <i class="fa-solid fa-users-viewfinder" style="color: #818cf8;"></i>
+            <h3>Join Watch Party</h3>
+          </div>
+        </div>
+        <div class="modal-body party-modal-body">
+          <div class="movie-room-badge">
+            <i class="fa-solid fa-film"></i>
+            <span id="join-room-movie-title">Loading Movie Stream...</span>
+          </div>
+          <p class="party-modal-desc">Enter your nickname to join your friends in sync & chat live!</p>
+          
+          <div class="input-group-styled">
+            <label for="join-nickname-input">Your Nickname</label>
+            <input type="text" id="join-nickname-input" class="party-styled-input" placeholder="e.g. Alex" maxlength="20" autofocus />
+          </div>
+
+          <button id="btn-join-room-submit" class="btn btn-accent party-submit-btn">
+            <i class="fa-solid fa-right-to-bracket"></i> Join Watch Party 🍿
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHARE WATCH PARTY LINK MODAL -->
+    <div id="share-room-modal" class="modal-backdrop hidden">
+      <div class="modal-card modal-card-sm party-modal-card">
+        <div class="modal-header party-modal-header">
+          <div class="party-modal-title">
+            <i class="fa-solid fa-share-nodes" style="color: #34d399;"></i>
+            <h3>Watch Party Created! 🍿</h3>
+          </div>
+          <button id="btn-close-share-modal" class="party-close-btn" title="Close Modal">&times;</button>
+        </div>
+        <div class="modal-body party-modal-body">
+          <p class="party-modal-desc">
+            Share this link with your friends anywhere in the world to watch in sync & chat live!
+          </p>
+
+          <div class="input-group-styled">
+            <label for="host-nickname-input">Your Host Nickname</label>
+            <input type="text" id="host-nickname-input" class="party-styled-input" placeholder="e.g. Host Alex" maxlength="20" />
+          </div>
+
+          <div class="share-url-card">
+            <span style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">Public Share Link</span>
+            <div id="share-link-text" class="share-link-url-box">Generating public URL...</div>
+          </div>
+
+          <button id="btn-copy-share-link" class="btn btn-accent party-submit-btn copy-link-large-btn">
+            <i class="fa-solid fa-copy"></i> Copy Shareable Link 📋
+          </button>
+
+          <div id="share-link-status" class="share-status-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WATCH PARTY ENDED FULL-SCREEN OVERLAY -->
+    <div id="room-ended-modal" class="modal-backdrop hidden" style="z-index: 99999999;">
+      <div class="modal-card modal-card-sm party-modal-card" style="text-align: center; padding: 2.5rem 2rem !important; max-width: 540px !important;">
+        <div style="font-size: 3.5rem; margin-bottom: 0.8rem;">🛑</div>
+        <h2 style="font-size: 1.8rem; font-weight: 800; color: #f87171; margin-bottom: 0.8rem;">Watch Party Ended</h2>
+        <p id="room-ended-desc" style="font-size: 1.1rem; color: #cbd5e1; line-height: 1.6; margin-bottom: 2rem;">
+          This Watch Party room was ended by the Host.
+        </p>
+        <button id="btn-return-home" class="btn btn-accent party-submit-btn" style="max-width: 320px; margin: 0 auto; display: block;">
+          <i class="fa-solid fa-house"></i> Return to Home Catalog 🏠
+        </button>
+      </div>
+    </div>
+
     <!-- Footer -->
     <footer class="app-footer">
     </footer>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script src="app.js"></script>
 </body>
 </html>

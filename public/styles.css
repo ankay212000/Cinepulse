@@ -938,6 +938,11 @@ video::cue {
   background: transparent !important;
 }
 
+/* Hide native video control bar fullscreen button to ensure Fullscreen uses container wrapper with Chat Overlay */
+video::-webkit-media-controls-fullscreen-button {
+  display: none !important;
+}
+
 /* Single Source of Truth Custom Subtitle Overlay */
 .subtitle-overlay {
   position: absolute;
@@ -1659,4 +1664,783 @@ video::cue {
   font-size: 0.9rem;
   color: var(--text-secondary);
   margin-top: 24px;
+}
+
+/* ==========================================================================
+   FLOATING LIVE CHAT OVERLAY (FULLSCREEN & NORMAL STREAMING MODES)
+   ========================================================================== */
+.chat-overlay-container {
+  position: absolute;
+  bottom: 95px; /* Elevated above HTML5 video control bar (volume, 3 dots, fullscreen) */
+  right: 24px;
+  width: 320px;
+  max-height: 380px;
+  background: rgba(10, 14, 26, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0.35; /* Subtle semi-transparent idle view */
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, background 0.3s ease;
+}
+
+.chat-overlay-container:hover,
+.chat-overlay-container:focus-within {
+  opacity: 0.65; /* Requested 0.65 opacity on hover/focus */
+  background: rgba(10, 14, 26, 0.65);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Auto-hide chat overlay on inactivity during video playback */
+.player-wrapper.user-inactive .chat-overlay-container:not(:hover):not(:focus-within):not(.chat-waking) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(10px) !important;
+}
+
+/* Clean Fade-in Wake on Incoming Chat Messages */
+.chat-overlay-container.chat-waking {
+  opacity: 0.65 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) !important;
+}
+
+.chat-overlay-container.minimized {
+  height: 44px;
+  max-height: 44px;
+  opacity: 0.6;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+}
+
+.chat-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #fff;
+}
+
+.chat-nickname-badge {
+  font-size: 0.72rem;
+  font-weight: 500;
+  background: rgba(99, 102, 241, 0.25);
+  color: #818cf8;
+  border: 1px solid rgba(129, 140, 248, 0.4);
+  padding: 2px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chat-nickname-badge:hover {
+  background: rgba(99, 102, 241, 0.45);
+  color: #fff;
+}
+
+.chat-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.chat-icon-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.chat-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.chat-messages-container {
+  flex: 1;
+  padding: 10px 12px;
+  max-height: 270px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-behavior: smooth;
+}
+
+.chat-messages-container::-webkit-scrollbar {
+  width: 4px;
+}
+.chat-messages-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.chat-notice-bubble {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 5px 8px;
+  border-radius: 6px;
+  border-left: 3px solid #818cf8;
+  line-height: 1.3;
+}
+
+.chat-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 90%;
+}
+
+.chat-bubble.mine {
+  align-self: flex-end;
+}
+
+.chat-bubble.mine .chat-text {
+  background: #4f46e5;
+  color: #fff;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-bubble.peer {
+  align-self: flex-start;
+}
+
+.chat-bubble.peer .chat-text {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  border-bottom-left-radius: 2px;
+}
+
+.chat-sender {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.chat-text {
+  font-size: 0.82rem;
+  padding: 7px 11px;
+  border-radius: 12px;
+  word-wrap: break-word;
+  line-height: 1.35;
+}
+
+.chat-time {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.5);
+  align-self: flex-end;
+  margin-top: 2px;
+}
+
+.chat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chat-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 6px 12px;
+  color: #fff;
+  font-size: 0.82rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.chat-input:focus {
+  border-color: #818cf8;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-chat-send {
+  background: var(--accent-primary);
+  border: none;
+  color: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.btn-chat-send:hover {
+  transform: scale(1.08);
+  background: #4f46e5;
+}
+
+/* Fullscreen Specific Overrides */
+.player-wrapper:fullscreen,
+.player-wrapper:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: #000 !important;
+  position: relative !important;
+}
+
+.player-wrapper:fullscreen #video-player,
+.player-wrapper:-webkit-full-screen #video-player {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100vh !important;
+  object-fit: contain !important;
+}
+
+.player-wrapper:fullscreen .chat-overlay-container,
+.player-wrapper:fullscreen .chat-overlay-container,
+.player-wrapper:-webkit-full-screen .chat-overlay-container,
+:fullscreen .chat-overlay-container,
+:-webkit-full-screen .chat-overlay-container {
+  position: absolute !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+}
+
+/* Top-Right Glass Floating Control Buttons (Mute + Fullscreen) */
+.floating-controls-group {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 110;
+}
+
+.floating-control-btn,
+.floating-fullscreen-btn {
+  position: relative;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  background: rgba(10, 14, 26, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.3s ease, transform 0.3s ease, background 0.2s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.player-wrapper:hover .floating-control-btn,
+.player-wrapper:hover .floating-fullscreen-btn,
+.player-wrapper.user-active:hover .floating-control-btn,
+.player-wrapper.user-active:hover .floating-fullscreen-btn {
+  opacity: 0.85;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.player-wrapper.user-inactive .floating-control-btn,
+.player-wrapper.user-inactive .floating-fullscreen-btn {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.floating-control-btn:hover,
+.floating-fullscreen-btn:hover {
+  opacity: 1 !important;
+  color: #ffffff;
+  background: rgba(79, 70, 229, 0.9);
+  border-color: #818cf8;
+  transform: scale(1.1) !important;
+}
+
+/* Watch Party Styled Modals */
+.party-modal-card {
+  max-width: 480px;
+  width: 90%;
+  background: rgba(15, 23, 42, 0.94) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(99, 102, 241, 0.15);
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.party-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem 1.5rem;
+  background: rgba(30, 41, 59, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.party-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.party-modal-title i {
+  font-size: 1.3rem;
+}
+
+.party-modal-title h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.party-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.party-close-btn:hover {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.15);
+}
+
+.party-modal-body {
+  padding: 1.5rem !important;
+}
+
+.movie-room-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  padding: 10px 14px;
+  border-radius: 10px;
+  color: #a5b4fc;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.party-modal-desc {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  margin-bottom: 1.2rem;
+  line-height: 1.4;
+}
+
+.input-group-styled {
+  margin-bottom: 1.2rem;
+}
+
+.input-group-styled label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.party-styled-input {
+  width: 100%;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: #ffffff;
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.party-styled-input:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+  background: rgba(30, 41, 59, 0.95);
+}
+
+.share-link-row {
+  display: flex;
+  gap: 10px;
+}
+
+.share-url-input {
+  flex: 1;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.copy-link-btn {
+  white-space: nowrap;
+  padding: 12px 18px;
+}
+
+.party-submit-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 10px;
+  margin-top: 0.5rem;
+}
+
+.share-status-msg {
+  font-size: 0.85rem;
+  color: #34d399;
+  text-align: center;
+  font-weight: 600;
+  min-height: 20px;
+  margin-top: 0.5rem;
+}
+
+/* Spacious Watch Party Room Header Banner */
+.watch-party-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.95));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 14px;
+  padding: 14px 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(99, 102, 241, 0.12);
+  transition: all 0.3s ease;
+}
+
+.party-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.party-badge-icon {
+  width: 46px;
+  height: 46px;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+
+.party-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.party-banner-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.party-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #818cf8;
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.8px;
+}
+
+.party-banner-title h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.party-banner-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.84rem;
+  color: #94a3b8;
+}
+
+.party-banner-meta i {
+  color: #fbbf24;
+}
+
+.party-banner-right {
+  display: flex;
+  align-items: center;
+}
+
+.role-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+.role-host {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fef08a;
+}
+
+.role-guest {
+  background: rgba(52, 211, 153, 0.18);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #6ee7b7;
+}
+
+@keyframes partyModalPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Instant Room Mode View Switching */
+html.is-room-mode:not(.room-joined) body #section-discover,
+html.is-room-mode:not(.room-joined) body #hero-carousel-section,
+html.is-room-mode:not(.room-joined) body #section-magnet,
+html.is-room-mode:not(.room-joined) body #section-downloads {
+  display: none !important;
+}
+
+html.is-room-mode body #stream-section {
+  display: block !important;
+}
+
+html.is-room-mode:not(.room-joined) body #join-room-modal {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  z-index: 9999999 !important;
+}
+
+#room-ended-modal:not(.hidden) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  z-index: 99999999 !important;
+}
+
+html.room-joined body #join-room-modal,
+body #join-room-modal.hidden {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Movie Room Title Badge Truncation */
+.movie-room-badge {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  background: rgba(99, 102, 241, 0.15) !important;
+  border: 1px solid rgba(129, 140, 248, 0.3) !important;
+  padding: 12px 16px !important;
+  border-radius: 12px !important;
+  color: #a5b4fc !important;
+  font-weight: 600 !important;
+  font-size: 0.92rem !important;
+  margin-bottom: 1.2rem !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+}
+
+.movie-room-badge span {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  display: block !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+/* Extra Large Watch Party Modals */
+.party-modal-card {
+  max-width: 640px !important;
+  width: 92vw !important;
+  min-height: 320px !important;
+  background: rgba(15, 23, 42, 0.98) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(99, 102, 241, 0.45) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.95), 0 0 60px rgba(99, 102, 241, 0.25) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  margin: auto !important;
+}
+
+.party-modal-header {
+  padding: 1.6rem 2.2rem !important;
+  background: rgba(30, 41, 59, 0.75) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.party-modal-title i {
+  font-size: 1.6rem !important;
+}
+
+.party-modal-title h3 {
+  font-size: 1.35rem !important;
+  font-weight: 800 !important;
+}
+
+.party-modal-body {
+  padding: 2.2rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.4rem !important;
+}
+
+.party-modal-desc {
+  font-size: 1.05rem !important;
+  color: #cbd5e1 !important;
+  line-height: 1.6 !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.movie-room-badge {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: rgba(99, 102, 241, 0.18) !important;
+  border: 1px solid rgba(129, 140, 248, 0.4) !important;
+  padding: 16px 20px !important;
+  border-radius: 14px !important;
+  color: #a5b4fc !important;
+  font-weight: 700 !important;
+  font-size: 1.08rem !important;
+  margin-bottom: 0.5rem !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+.movie-room-badge span {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.share-url-card {
+  background: rgba(30, 41, 59, 0.95) !important;
+  border: 1px solid rgba(129, 140, 248, 0.4) !important;
+  border-radius: 16px !important;
+  padding: 18px 22px !important;
+}
+
+.share-link-url-box {
+  font-family: monospace !important;
+  font-size: 1.05rem !important;
+  color: #34d399 !important;
+  word-break: break-all !important;
+  user-select: all !important;
+  -webkit-user-select: all !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  padding: 14px 18px !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  margin-top: 6px !important;
+}
+
+.party-styled-input {
+  width: 100% !important;
+  height: 54px !important;
+  background: rgba(30, 41, 59, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 14px !important;
+  padding: 0 20px !important;
+  color: #ffffff !important;
+  font-size: 1.1rem !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+}
+
+.party-submit-btn {
+  width: 100% !important;
+  padding: 16px 24px !important;
+  font-size: 1.15rem !important;
+  font-weight: 800 !important;
+  border-radius: 14px !important;
+  margin-top: 0.5rem !important;
+}
+
+/* Hide Watch Party & CineChat components for Standalone Torrent Streamer MVP */
+#btn-create-party,
+#watch-party-banner,
+#chat-overlay,
+#join-room-modal,
+#share-room-modal,
+#room-ended-modal,
+.chat-overlay-container,
+.watch-party-banner {
+  display: none !important;
 }
